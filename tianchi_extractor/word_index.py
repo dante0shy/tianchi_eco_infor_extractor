@@ -6,9 +6,7 @@ class WordPrefixTree():
     def __init__(self):
         self.node = {}
         self.index = -1
-
     def add(self,word,index):
-
         if not word:
             self.index = index
             return
@@ -17,7 +15,6 @@ class WordPrefixTree():
         else:
             self.node[word[0]] = WordPrefixTree()
             self.node[word[0]].add(word[1:], index)
-
     def check(self,word):
         if not word:
             return self.index
