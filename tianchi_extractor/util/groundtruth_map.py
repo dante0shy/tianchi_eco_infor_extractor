@@ -44,13 +44,6 @@ def get_data(file1):
                     break
     return tmp
 
-
-
-
-
-
-
-
 import json
 
 
@@ -108,7 +101,7 @@ def substring_indexes(substring, string):
     """
     Generate indices of where substring begins in string
 
-    >>> list(substring_indexes('me', "The cat says meow, meow"))
+    list(substring_indexes('me', "The cat says meow, meow"))
     [13, 19]
     """
     last_found = -1  # Begin at -1 so the next position to search from is 0
