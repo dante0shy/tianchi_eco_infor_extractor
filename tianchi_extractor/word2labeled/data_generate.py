@@ -1,9 +1,15 @@
 import os
+import glob
+from tianchi_extractor.config import TASKS
+
 if __name__=='__main__':
     # modify this path
     base_path = os.path.dirname(os.path.dirname(__file__))
     # THIS IS JUST A TEST. need to modify category [ZENGJIANCHI, HETONG, or DINGZENG]. and file name.
-    file_id = '20596042'
+    data_pos = 'round1_train_20180518'
+    files = glob.glob(os.path.join(base_path,data_pos,'*','*'))
+
+
 
     valid_path = os.path.join(base_path, cat, 'html', file_id+'.html')
 

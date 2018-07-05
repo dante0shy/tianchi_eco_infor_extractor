@@ -1,10 +1,10 @@
-
 import os
 import html2text
 import re
-
-
 ###read html function
+from tianchi_extractor.config import HETONG, ZENGJIANCHI, DINGZENG, TASKS, hetong_string, dingzeng_string, \
+    zengjianchi_string
+
 def get_data(file1):
     with open(file1, 'r') as f:
         text = f.read()
@@ -45,19 +45,9 @@ def get_data(file1):
 
 import json
 
-HETONG = 'hetong'
-ZENGJIANCHI = 'zengjianchi'
-DINGZENG = 'dingzeng'
-TASKS=[HETONG, DINGZENG, ZENGJIANCHI]
-
-hetong_string = '{"id": null, "party_a": null,  "party_b": null,  "project_name": null,  "contract_name": null,  "up_limit": null,  "low_limit": null,  "union_member": null}'
-dingzeng_string = '{"id": null, "target": null,	"buy_way": null, "amount": null,	"money": null,	"lock_time": null,	"pay_method": null}'
-zengjianchi_string = '{	"id": null,	"full_name": null,	"short_name": null,	"change_date": null,	"change_price": null,	"change_amount": null,	"stock_hold": null,	"percent_hold": null}'
-
-
 
 def make_dict(category):
-    from_string = hetong_string if category==HETONG else (
+    from_string = hetong_string if category == HETONG else (
         dingzeng_string if category == DINGZENG else zengjianchi_string)
     return json.loads(from_string)
 
@@ -276,7 +266,6 @@ if __name__=='__main__':
 
 
 # Below is code by YIJI HE
-import csv
 # path="/Users/ji/Desktop/天池比赛/round1_train_20180518/hetong/html"
 
 
