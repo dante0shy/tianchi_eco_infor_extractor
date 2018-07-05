@@ -1,6 +1,12 @@
+# -*- coding: utf-8 -*-
+import sys
+reload(sys)
+sys.setdefaultencoding("utf-8")
 import os
 import html2text
 import re
+import collections
+
 ###read html function
 from tianchi_extractor.config import HETONG, ZENGJIANCHI, DINGZENG, TASKS, hetong_string, dingzeng_string, \
     zengjianchi_string
@@ -49,7 +55,7 @@ import json
 def make_dict(category):
     from_string = hetong_string if category == HETONG else (
         dingzeng_string if category == DINGZENG else zengjianchi_string)
-    return json.loads(from_string)
+    return json.JSONDecoder(object_pairs_hook=collections.OrderedDict).decode(from_string)
 
 
 def parse_label_line(label_line, category):
@@ -85,7 +91,7 @@ def read_labels(label_file_path, task_name):
     :return: a dictionary. key is 'id' of each sample, value is a list of JSON object, corresponding to all labels
             highlighted in this sample
     '''
-    labels = dict()
+    labels = collections.OrderedDict()
     with open(label_file_path, 'r') as label_file:
         for line in label_file:
             json_label = parse_label_line(line, task_name)
@@ -118,7 +124,7 @@ def extract_digits(line):
     :param line: a sample
     :return: a list of tuple (start_index, text)
     '''
-    digits_pattern = re.compile(r"([\d*,]*d*\.?\d+)[%亿万股元千\|]")
+    digits_pattern = re.compile(r"([\d*,]*d*\.?\d+)[%亿万股元千\|]", flags=re.U)
     # corner cases: floating 0.0023; american 213,31,23; chinese 15亿, 234234股;
     return [(m.start(), m.group()) for m in digits_pattern.finditer(line)]
 
@@ -209,14 +215,14 @@ def gen_out_string(label_list, substitution_mapping, input_str):
                         replace_element(out_str_list, digit_start, len(digit_val)-1, substitution_mapping[key])
                         # print(input_str[digit_start:digit_start + len(digit_val)-1])
                 if not is_match_found:
-                    print('\nError: digital label not found in original text.\n', 'key: ', val)
-                    print([normalize_digit(m) for k,m in digits_strs])
+                    print('error: digital label not found in original text.', ' key: ', val)
+                    # print([normalize_digit(m) for k,m in digits_strs])
             else:
                 if is_date(val):
                     val = modify_date(val)
                 # normal text replacement
                 if input_str.find(val) == -1:
-                    print('\nError: text label not found in original text.\n', 'key: ', val)
+                    print('Error: text label not found in original text.', ' key: ', val)
                     continue
                 positions = substring_indexes(val, input_str)
                 # do replacement
