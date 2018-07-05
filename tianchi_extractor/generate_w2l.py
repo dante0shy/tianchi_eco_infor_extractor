@@ -1,6 +1,6 @@
-from util.word_index import WordPrefixTree
+from tianchi_extractor.util.word_index import WordPrefixTree
 import json
-from util.text_2_list import get_data,fine_tune_word,jie_ba_initial
+from tianchi_extractor.util.text_2_list import get_data,fine_tune_word,jie_ba_initial
 import glob
 import random
 import jieba

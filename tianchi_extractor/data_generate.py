@@ -1,4 +1,3 @@
-from util.groundtruth_map import TASKS
 import os
 if __name__=='__main__':
     # modify this path

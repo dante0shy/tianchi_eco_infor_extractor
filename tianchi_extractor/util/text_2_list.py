@@ -5,7 +5,7 @@ import glob
 import json
 import re
 import random
-from util.stop_words import stop_word
+from tianchi_extractor.util.stop_words import stop_word
 
 
 def get_data(file):
