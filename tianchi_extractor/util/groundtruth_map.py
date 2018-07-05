@@ -2,10 +2,12 @@
 import sys
 reload(sys)
 sys.setdefaultencoding("utf-8")
+
 import os
 import html2text
 import re
 import collections
+import regex
 
 ###read html function
 from tianchi_extractor.config import HETONG, ZENGJIANCHI, DINGZENG, TASKS, hetong_string, dingzeng_string, \
@@ -13,7 +15,7 @@ from tianchi_extractor.config import HETONG, ZENGJIANCHI, DINGZENG, TASKS, heton
 
 def get_data(file1):
     with open(file1, 'r') as f:
-        text = f.read()
+        text = f.read().encode('utf-8')
         text = ''.join(text)  # map(lambda x: x.replace('\n','').split('\t'),text)
         h = html2text.HTML2Text()
         h.UNICODE_SNOB = True
@@ -118,13 +120,14 @@ def substring_indexes(substring, string):
         yield last_found
 
 
+
 def extract_digits(line):
     '''
     extract digits in one sample
     :param line: a sample
     :return: a list of tuple (start_index, text)
     '''
-    digits_pattern = re.compile(r"([\d*,]*d*\.?\d+)[%亿万股元千\|]", flags=re.U)
+    digits_pattern = re.compile(ur"([\d*,]*d*\.?\d+)[%亿万股元千\|]", flags=re.U)
     # corner cases: floating 0.0023; american 213,31,23; chinese 15亿, 234234股;
     return [(m.start(), m.group()) for m in digits_pattern.finditer(line)]
 
@@ -200,6 +203,7 @@ def gen_out_string(label_list, substitution_mapping, input_str):
     out_str_list = ['z'] * len(input_str)
     # extract informative digits in original text
     digits_strs = extract_digits(input_str)
+    # print digits_strs
     for label_json in label_list:
         for key, val in label_json.items():
             if key == 'id' or key =='buy_way' or not val:
@@ -227,9 +231,8 @@ def gen_out_string(label_list, substitution_mapping, input_str):
                 positions = substring_indexes(val, input_str)
                 # do replacement
                 for position in positions:
-                    replace_element(out_str_list, position, len(val), substitution_mapping[key])
+                    replace_element(out_str_list, position, len(val.decode('utf-8')), substitution_mapping[key])
                     # print(input_str[position:position+len(val)])
-            # print()
     return ''.join(out_str_list)
 
 
@@ -237,8 +240,8 @@ if __name__=='__main__':
     # modify this path
     base_path = '/Users/polybahn/Desktop/alicont/round1_train_20180518'
     # THIS IS JUST A TEST. need to modify category [ZENGJIANCHI, HETONG, or DINGZENG]. and file name.
-    cat = ZENGJIANCHI
-    file_id = '20596042'
+    cat = HETONG
+    file_id = '15740684'
 
     valid_path = os.path.join(base_path, cat, 'html', file_id+'.html')
 
@@ -257,15 +260,14 @@ if __name__=='__main__':
     # for tabular situation, please refer example: gupiao/10112. We need to add stop sign('||') between adjacent rows
     content = [e + '||' if '|' in e else e for e in content]
     # done pre processing, combine as input
-    in_string = ''.join(content).replace('（', '(').replace('）', ')')
+    in_string = ''.join(content).replace('（', '(').replace('）', ')').decode('utf-8')
     print(in_string)
 
     # step 4: generate a out_string using label dicts. same size of in_string
     result = gen_out_string(label, char_mapping, in_string)
     res_l = [c for c in result]
     in_l = [c for c in in_string]
-    print(list(zip(res_l, in_l)))
-
+    print(result)
 
 
 
