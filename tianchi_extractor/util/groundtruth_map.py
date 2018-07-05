@@ -7,7 +7,6 @@ import os
 import html2text
 import re
 import collections
-import regex
 
 ###read html function
 from tianchi_extractor.config import HETONG, ZENGJIANCHI, DINGZENG, TASKS, hetong_string, dingzeng_string, \
