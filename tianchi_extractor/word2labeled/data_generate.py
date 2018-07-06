@@ -71,6 +71,7 @@ if __name__=='__main__':
 
 
     # labels = []
+    # TASKS = [TASKS[1]]
     for task in TASKS:
         out_put_dir_task =os.path.join(out_put_dir,task)
         if not os .path.exists(out_put_dir_task):
@@ -103,7 +104,10 @@ if __name__=='__main__':
             for idx, input_file in enumerate(input_files):
                 if  not idx %100 or not idx%(step-1):
                     print('{} : {} start'.format(task,idx))
+
                 id = input_file.split('/')[-1].split('.')[0]
+                if os.path.exists(os.path.join(out_put_dir_task_ori, '{}.json'.format(id))):
+                    continue
                 label = labels[str(id)]
                 # step 3: preprocessing input
                 content = list(filter(lambda x: x, map(lambda x: re.sub(' ', '', x), get_data(input_file))))
