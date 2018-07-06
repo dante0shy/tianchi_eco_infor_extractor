@@ -20,7 +20,6 @@ def get_data(file1):
         h.UNICODE_SNOB = True
         h.IGNORE_IMAGES = True
         text = h.handle(text)
-
         tmp = list(filter(lambda x: x, text.split('\n')))
         pos = 0
         suit = 0
@@ -41,6 +40,7 @@ def get_data(file1):
                 pos += 1
                 if pos == len(tmp):
                     break
+
     return tmp
 
 import json
@@ -169,6 +169,7 @@ def replace_element(out_list, start_pos, length, change_to_char):
         out_list[start_pos+i] = change_to_char
 
 
+
 def is_date(string):
     if not '-' in string:
         return False
@@ -218,6 +219,7 @@ def gen_out_string(label_list, substitution_mapping, input_str):
                 if not is_match_found:
                     print('error: digital label not found in original text.')
                     print val.decode('utf-8')
+
                     # print([normalize_digit(m) for k,m in digits_strs])
             else:
                 vals = [val]
@@ -237,6 +239,7 @@ def gen_out_string(label_list, substitution_mapping, input_str):
                 if not isFound:
                     print('Error: text label not found in original text.')
                     print val.decode('utf-8')
+
     return ''.join(out_str_list)
 
 
