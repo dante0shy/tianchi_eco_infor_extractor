@@ -1,7 +1,8 @@
+# -*- coding: UTF-8 -*-
+
 import tensorflow as tf
 
-from lstm_crf.tf_config import Config
-
+import numpy as np
 class LSTM_CRF():
     def __init__(self,config,is_training= 0,is_test = 0):
         self.keep_prob = tf.placeholder(tf.float32, shape=[], name="keep_prob")
@@ -9,35 +10,50 @@ class LSTM_CRF():
         num_step = config.num_step
         class_num = config.class_num
         words_len = config.word_len
-        self.input_data = tf.placeholder(tf.float32, [None, num_step,config.vector_len])
+        embed_dim = config.embed_dim
+        self.input_data = tf.placeholder(tf.float32, [None, num_step])
         self.target = tf.placeholder(tf.int32, [None,num_step])
         self.mask = tf.placeholder(tf.int32, [None,])
+        self.seq_class = tf.placeholder(tf.int32, [None,config.seq_class])
         hidden_neural_size = config.hidden_neural_size
         hidden_layer_num = config.hidden_layer_num
         self.new_batch_size = tf.placeholder(tf.int32, shape=[], name="new_batch_size")
         self.is_training =  tf.placeholder(tf.bool)
         self.trans_params = tf.get_variable("transitions",[class_num,class_num],tf.float32)
         self._batch_size_update = tf.assign(self.batch_size, self.new_batch_size)
-        l2_loss = tf.constant(0.01)
         input_data = tf.reshape(self.input_data, [-1, config.vector_len])
-        with tf.variable_scope("dense0_1"):
-            W0_1 = tf.get_variable("W", dtype=tf.float32,
-                                 shape=[config.vector_len, 512])
-            # b0_1 = tf.get_variable("b", shape=[512],
-            #                      dtype=tf.float32, initializer=tf.zeros_initializer())
+        self.pad = tf.placeholder(tf.float32, [None, 1, embed_dim, 1], name='pad')
+        l2_loss = tf.constant(0.01)
+        with tf.device("/cpu:0"),tf.name_scope("embedding_layer"):
+            embedding = tf.get_variable("embedding",[words_len,embed_dim],
+                                        dtype=tf.float32)
+            inputs = tf.nn.embedding_lookup(embedding, self.input_data)
+            emb = tf.expand_dims(inputs, -1)
+        pooled_concat = []
+        reduced = np.int32(np.ceil((208) * 1.0 / 4))
+        for i, filter_size in enumerate([3,4,5]):
+            with tf.name_scope('conv-maxpool-%s' % filter_size):
+                # Zero paddings so that the convolution output have dimension batch x sequence_length x emb_size x channel
+                num_prio = (filter_size - 1) // 2
+                num_post = (filter_size - 1) - num_prio
+                pad_prio = tf.concat([self.pad] * num_prio, 1)
+                pad_post = tf.concat([self.pad] * num_post, 1)
+                emb_pad = tf.concat([pad_prio, emb, pad_post], 1)
 
-            input_data = tf.matmul(input_data, W0_1) #+ b0_1
-            input_data = tf.contrib.layers.batch_norm(input_data,is_training = self.is_training)
-            input_data = tf.nn.tanh(input_data)
-        with tf.variable_scope("dense0_2"):
-            W0_2 = tf.get_variable("W", dtype=tf.float32,
-                                 shape=[512, 512])
-            # b0_2 = tf.get_variable("b", shape=[512],
-            #                      dtype=tf.float32, initializer=tf.zeros_initializer())
-            input_data = tf.matmul(input_data, W0_2)# + b0_2
-            input_data = tf.contrib.layers.batch_norm(input_data,is_training = self.is_training)
-            input_data = tf.nn.tanh(input_data)
-        input_data = tf.reshape(input_data,[-1, num_step,512])
+                filter_shape = [filter_size, embed_dim, 1, 32]
+                W = tf.Variable(tf.truncated_normal(filter_shape, stddev=0.1), name='W')
+                conv = tf.nn.conv2d(emb_pad, W, strides=[1, 1, 1, 1], padding='VALID', name='conv')
+
+                h = tf.nn.relu(conv, name='relu')
+                # Maxpooling over the outputs
+                pooled = tf.nn.max_pool(h, ksize=[1, 4, 1, 1], strides=[1, 4, 1, 1],
+                                        padding='SAME', name='pool')
+                pooled = tf.reshape(pooled, [-1, reduced, 32])
+                pooled_concat.append(pooled)
+
+        pooled_concat = tf.concat(pooled_concat, 2)
+        pooled_concat = tf.nn.dropout(pooled_concat, self.keep_prob)
+
         cell_fw = tf.nn.rnn_cell.MultiRNNCell([tf.contrib.rnn.LSTMCell(hidden_neural_size, forget_bias=1.0)
                                                for _ in range(hidden_layer_num)] , state_is_tuple=True)
         cell_bw = tf.nn.rnn_cell.MultiRNNCell([tf.contrib.rnn.LSTMCell(hidden_neural_size, forget_bias=1.0)
@@ -45,17 +61,13 @@ class LSTM_CRF():
         _output = tf.nn.bidirectional_dynamic_rnn(
             cell_fw=cell_fw,
             cell_bw=cell_bw,
-            inputs=input_data,
+            inputs=pooled_concat,
             dtype=tf.float32,
             sequence_length=self.mask)
 
         (output_fw, output_bw), _ = _output
         output = tf.concat([output_fw, output_bw],2)
-
-
         output = tf.reshape(output,[-1,2 * hidden_neural_size])
-        # output = tf.contrib.layers.batch_norm(output)
-        # output = tf.nn.sigmoid(output)
         dense_size = 1024
         with tf.variable_scope("dense1"):
             W1 = tf.get_variable("W", dtype=tf.float32,
@@ -65,7 +77,6 @@ class LSTM_CRF():
                                 dtype=tf.float32, initializer=tf.zeros_initializer())
 
             output = tf.matmul(output, W1) + b1
-            # output = tf.contrib.layers.batch_norm(output)
             output = tf.nn.relu(output)
 
         with tf.variable_scope("proj"):

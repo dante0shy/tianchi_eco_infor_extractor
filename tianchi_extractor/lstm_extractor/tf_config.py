@@ -1,3 +1,5 @@
+# -*- coding: UTF-8 -*-
+
 import tensorflow as tf
 import os
 base_path = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
@@ -24,9 +26,10 @@ flags.DEFINE_integer('max_decay_epoch',10,'num epoch')
 flags.DEFINE_integer('max_grad_norm',5,'max_grad_norm')
 flags.DEFINE_string('out_dir',os.path.join(base_path,'extras','model'),'output directory')
 flags.DEFINE_integer('check_point_every',5,'checkpoint every num epoch ')
-flags.DEFINE_integer('max_vector_len',2000,'max vector len ')
+flags.DEFINE_integer('max_vector_len',1000,'max vector len ')
 flags.DEFINE_integer('vector_len',2,'vector len ')#107
 flags.DEFINE_integer('word_len',171785,'vector len ')
+flags.DEFINE_integer('seq_class',3,'seq_class')
 flags.DEFINE_string('train_data',os.path.join(base_path,'extras','train.json'),'train data')
 flags.DEFINE_string('val_data',os.path.join(base_path,'extras','val.json'),'val data')
 flags.DEFINE_string('char_list',os.path.join(base_path,'extras','word_list_0.json'),'char list')
@@ -56,3 +59,6 @@ class Config(object):
     label_list = FLAGS.label_list
     word_len = FLAGS.word_len
     embed_dim = FLAGS.embed_dim
+    seq_class = FLAGS.seq_class
+
+path_format = os.path.join(base_path,'extras','data_out','{}','par','{}.json')
