@@ -19,7 +19,6 @@ def get_data(file1):
         h.UNICODE_SNOB = True
         h.IGNORE_IMAGES = True
         text = h.handle(text)
-
         tmp = list(filter(lambda x: x, text.split('\n')))
         pos = 0
         suit = 0
@@ -40,6 +39,7 @@ def get_data(file1):
                 pos += 1
                 if pos == len(tmp):
                     break
+
     return tmp
 
 import json
@@ -163,6 +163,7 @@ def is_digit_match(ori_text, label_text):
 def replace_element(out_list, start_pos, length, change_to_char):
     for i in range(length):
         out_list[start_pos+i] = change_to_char
+
 
 
 def is_date(string):
