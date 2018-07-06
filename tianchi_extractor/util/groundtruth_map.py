@@ -49,7 +49,7 @@ import json
 def make_dict(category):
     from_string = hetong_string if category == HETONG else (
         dingzeng_string if category == DINGZENG else zengjianchi_string)
-    return json.JSONDecoder(object_pairs_hook=collections.OrderedDict).decode(from_string)
+    return json.JSONDecoder(object_pairs_hook=collections.OrderedDict).decode(from_string.decode('utf-8'))
 
 
 def parse_label_line(label_line, category):
@@ -60,7 +60,7 @@ def parse_label_line(label_line, category):
     for word, key in zip(words, json_obj.keys()):
         if not word:
             continue
-        json_obj[key] = word.strip()
+        json_obj[key] = word.strip().lower()
     return json_obj
 
 
@@ -119,13 +119,13 @@ def extract_digits(line):
     :param line: a sample
     :return: a list of tuple (start_index, text)
     '''
-    digits_pattern = re.compile(ur"([\d*,]*d*\.?\d+)[%亿万股元千\|]", flags=re.U)
+    digits_pattern = re.compile(ur"([\d*,]*d*\.?\d+)[%亿万股元千\|月个]", flags=re.U)
     # corner cases: floating 0.0023; american 213,31,23; chinese 15亿, 234234股;
     return [(m.start(), m.group()) for m in digits_pattern.finditer(line)]
 
 
 def normalize_digit(digit_str):
-    remove_chars = [',', '.', '|', '元', '亿', '万', '股', '千', '%']
+    remove_chars = [',', '.', '|', '元', '亿', '万', '股', '千', '%','月', '个']
     for char in remove_chars:
         digit_str = digit_str.replace(char, '')
     return digit_str.strip('0')
@@ -140,7 +140,9 @@ def is_digit_match(ori_text, label_text):
     '''
     # for floating point number smaller than 1, we need to specify rule
     if float(label_text) <= 1:
-        if ',' in ori_text or ori_text[-1] in ['元', '股', '亿', '万', '千'] or not '.' in ori_text:
+        if float(label_text) == 0:
+            return False
+        if ',' in ori_text or ori_text[-1] in ['元', '股', '亿', '万', '千', '月', '个'] or not '.' in ori_text:
             return False
         ret = float(ori_text[:-1]) / float(label_text)
         if ret == 1 or ret == 100:
@@ -181,7 +183,10 @@ def modify_date(string):
     if not is_date(string):
         return
     words = string.split('-')
-    return words[0]+'年'+words[1].lstrip('0')+'月'+words[2].lstrip('0')+'日'
+    return [words[0]+'年'+words[1].lstrip('0')+'月'+words[2].lstrip('0')+'日', # 2017年X月X日
+            words[1].lstrip('0')+'月'+words[2].lstrip('0')+'日', # in some cases no year： X月X日
+            words[0] + '.' + words[1].lstrip('0') + '.' + words[2].lstrip('0')]
+
 
 
 def gen_out_string(label_list, substitution_mapping, input_str):
@@ -203,7 +208,7 @@ def gen_out_string(label_list, substitution_mapping, input_str):
                 continue
             # print(val)
             # here, for digital number and dates, we need to it in different way
-            if not is_date(val) and label_digits_pattern.match(val):
+            if not is_date(val) and (val.isdigit() or val.replace('.', '').isdigit()):
                 is_match_found = False
                 for digit_start, digit_val in digits_strs:
                     if is_digit_match(digit_val, val):
@@ -211,21 +216,30 @@ def gen_out_string(label_list, substitution_mapping, input_str):
                         # replace
                         replace_element(out_str_list, digit_start, len(digit_val)-1, substitution_mapping[key])
                         # print(input_str[digit_start:digit_start + len(digit_val)-1])
-                # if not is_match_found:
-                #     print('error: digital label not found in original text.', ' key: ', val)
+                if not is_match_found:
+                    print('error: digital label not found in original text.')
+                    print val.decode('utf-8')
+
                     # print([normalize_digit(m) for k,m in digits_strs])
             else:
+                vals = [val]
                 if is_date(val):
-                    val = modify_date(val)
-                # normal text replacement
-                if input_str.find(val) == -1:
-                    # print('Error: text label not found in original text.', ' key: ', val)
-                    continue
-                positions = substring_indexes(val, input_str)
-                # do replacement
-                for position in positions:
-                    replace_element(out_str_list, position, len(val.decode('utf-8')), substitution_mapping[key])
-                    # print(input_str[position:position+len(val)])
+                    vals = modify_date(val)
+                isFound = False
+                for val in vals:
+                    # normal text replacement
+                    if input_str.find(val) == -1:
+                        continue
+                    isFound = True
+                    positions = substring_indexes(val, input_str)
+                    # do replacement
+                    for position in positions:
+                        replace_element(out_str_list, position, len(val.decode('utf-8')), substitution_mapping[key])
+                        # print(input_str[position:position+len(val)])
+                if not isFound:
+                    print('Error: text label not found in original text.')
+                    print val.decode('utf-8')
+
     return ''.join(out_str_list)
 
 
@@ -233,34 +247,38 @@ if __name__=='__main__':
     # modify this path
     base_path = '/Users/polybahn/Desktop/alicont/round1_train_20180518'
     # THIS IS JUST A TEST. need to modify category [ZENGJIANCHI, HETONG, or DINGZENG]. and file name.
-    cat = HETONG
-    file_id = '15740684'
+    cat = DINGZENG
+    file_ids = ['4952968']
+    is_debug = False
+    if not is_debug:
+        file_ids = [file_name[:-5] for file_name in os.listdir(os.path.join(base_path, cat, 'html')) if file_name.endswith('html')]
+    for file_id in file_ids:
+        print file_id
+        valid_path = os.path.join(base_path, cat, 'html', file_id+'.html')
 
-    valid_path = os.path.join(base_path, cat, 'html', file_id+'.html')
+        # step 1: read all labels in this category
+        labels = read_labels(os.path.join(base_path, cat, cat + '.train'), cat)
+        label = labels[file_id]
+        # print(label)
 
-    # step 1: read all labels in this category
-    labels = read_labels(os.path.join(base_path, cat, cat + '.train'), cat)
-    label = labels[file_id]
-    print(label)
+        # step 2: get substitution mapping of this category
+        char_mapping = gen_substitution_dict(cat)
+        # print(char_mapping)
 
-    # step 2: get substitution mapping of this category
-    char_mapping = gen_substitution_dict(cat)
-    print(char_mapping)
+        # step 3: preprocessing input
+        # remove spaces in each element in resulting list of get_data() function
+        content = list(filter(lambda x: x, map(lambda x: re.sub(' ', '', x), get_data(valid_path))))
+        # for tabular situation, please refer example: gupiao/10112. We need to add stop sign('||') between adjacent rows
+        content = [e + '||' if '|' in e else e for e in content]
+        # done pre processing, combine as input
+        in_string = ''.join(content).replace('（', '(').replace('）', ')').decode('utf-8').lower()
+        print(in_string)
 
-    # step 3: preprocessing input
-    # remove spaces in each element in resulting list of get_data() function
-    content = list(filter(lambda x: x, map(lambda x: re.sub(' ', '', x), get_data(valid_path))))
-    # for tabular situation, please refer example: gupiao/10112. We need to add stop sign('||') between adjacent rows
-    content = [e + '||' if '|' in e else e for e in content]
-    # done pre processing, combine as input
-    in_string = ''.join(content).replace('（', '(').replace('）', ')').decode('utf-8')
-    print(in_string)
+        # step 4: generate a out_string using label dicts. same size of in_string
+        result = gen_out_string(label, char_mapping, in_string)
+        # for c, l in zip(in_string, result):
+        #     print c + ' ' + l
 
-    # step 4: generate a out_string using label dicts. same size of in_string
-    result = gen_out_string(label, char_mapping, in_string)
-    res_l = [c for c in result]
-    in_l = [c for c in in_string]
-    print(result)
 
 
 
