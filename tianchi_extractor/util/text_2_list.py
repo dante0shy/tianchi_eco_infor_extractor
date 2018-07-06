@@ -7,7 +7,6 @@ import re
 import random
 from tianchi_extractor.util.stop_words import stop_word
 
-
 def get_data(file):
     with open(file, 'r') as f:
         text = f.read().decode('utf8')

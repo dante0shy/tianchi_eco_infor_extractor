@@ -6,6 +6,8 @@ import glob
 import random
 import jieba
 import os
+
+
 def get_word_list(t,index_tree):
     seg_list = jieba.cut(t, cut_all=False, HMM=True)
     fined_seg_list = [fine_tune_word(x) for x in seg_list]

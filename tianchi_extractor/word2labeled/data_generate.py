@@ -17,7 +17,7 @@ index_tree = WordPrefixTree()
 mutiprocess  =True
 for idx, word in enumerate(words_list):
     index_tree.add(word, idx)
-
+error = 0
 
 def fine_tune_word(text_labeled):
     try:
@@ -70,7 +70,6 @@ if __name__=='__main__':
     label_dict = []
 
 
-
     # labels = []
     for task in TASKS:
         out_put_dir_task =os.path.join(out_put_dir,task)
@@ -100,6 +99,7 @@ if __name__=='__main__':
 
 
         def build_data(input_files):
+            error = 0
             for idx, input_file in enumerate(input_files):
                 if  not idx %100 or not idx%(step-1):
                     print('{} : {} start'.format(task,idx))
@@ -110,10 +110,17 @@ if __name__=='__main__':
                 content = [e + '||' if '|' in e else e for e in content]
                 in_string = ''.join(content).replace('（', '(').replace('）', ')')
                 # step 4: generate a out_string using label dicts. same size of in_string
-                result = gen_out_string(label, char_mapping, in_string)
-                seg_list = list(jieba.cut(in_string, cut_all=False, HMM=True))
+                try:
+                    result = gen_out_string(label, char_mapping, in_string)
+                    seg_list = list(jieba.cut(in_string, cut_all=False, HMM=True))
+                except:
+                    error +=1
+                    print('{} : {} error {}'.format(task, idx , error))
+                    continue
+
                 label_mask = []
                 start = 0
+
                 json.dump([in_string,result],open(os.path.join(out_put_dir_task_ori,'{}.json'.format(id)),'w'))
                 for s in seg_list:
                     label_mask.append(result[start:start+len(s)])
@@ -126,7 +133,6 @@ if __name__=='__main__':
                 pass
                 # print(list(zip(res_l, in_l)))
         # single process
-
         if mutiprocess:
             # muti process
             with ProcessPoolExecutor(max_workers=4) as executor:

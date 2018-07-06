@@ -211,15 +211,15 @@ def gen_out_string(label_list, substitution_mapping, input_str):
                         # replace
                         replace_element(out_str_list, digit_start, len(digit_val)-1, substitution_mapping[key])
                         # print(input_str[digit_start:digit_start + len(digit_val)-1])
-                if not is_match_found:
-                    print('error: digital label not found in original text.', ' key: ', val)
+                # if not is_match_found:
+                #     print('error: digital label not found in original text.', ' key: ', val)
                     # print([normalize_digit(m) for k,m in digits_strs])
             else:
                 if is_date(val):
                     val = modify_date(val)
                 # normal text replacement
                 if input_str.find(val) == -1:
-                    print('Error: text label not found in original text.', ' key: ', val)
+                    # print('Error: text label not found in original text.', ' key: ', val)
                     continue
                 positions = substring_indexes(val, input_str)
                 # do replacement
