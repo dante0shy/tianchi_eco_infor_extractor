@@ -59,10 +59,6 @@ if __name__=='__main__':
     out_put_dir  = os.path.join(base_path,'extras','data_out')
     if not os .path.exists(out_put_dir):
         os.mkdir(out_put_dir)
-
-
-
-
     # THIS IS JUST A TEST. need to modify category [ZENGJIANCHI, HETONG, or DINGZENG]. and file name.
     data_pos = 'round1_train_20180518'
     files = os.path.join(base_path,data_pos,'{}','html','*')

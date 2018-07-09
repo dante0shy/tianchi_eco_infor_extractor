@@ -113,5 +113,8 @@ extras/word_lists/*
 ltp_data_v3.4.0.zip
 extras/data_out
 .idea/
+extras/model
+extras/test_res
+
 .DS_Store
 

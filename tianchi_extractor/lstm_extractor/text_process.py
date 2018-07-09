@@ -12,13 +12,8 @@ from tianchi_extractor.config import TASKS
 class Data_loader():
     def __init__(self,input,word_len = 400):
         self.word_len = word_len
-        self.input_file = json.load(open(input,'r'))
-        # self.input_file =[f for f in self.input_file if '/56/' in f]
-        # self.label_list = json.load(open(label_list,'r'))
-        # self.char_list = json.load(open(word_list,'r'))
-        self.data = self._build_data_lsit(self.input_file)
-
-        # self.batch_size =batch_size
+        self.sen = []
+        self.data = self._build_data_lsit(input)
         pass
 
     def _build_data_lsit(self,input_file):
@@ -41,6 +36,7 @@ class Data_loader():
             if not os.path.exists(path):
                 continue
             data = json.load(open(path,'r'))
+            self.sen = data
             split_pos = filter(lambda x :x[1][0]==u'。',enumerate(data))
             # max_len = max([max_len,len(data)])
             # print(max_len)
@@ -57,45 +53,42 @@ class Data_loader():
                 mask_one = min([len(d),Config.max_vector_len])
                 task_one  = [task]*(mask_one)
                 word_one = map(int,data_one[:,2].tolist())
-                label_one = map(lambda x:label_dict.index(sorted(list(x))[int(0.5*len(x))]),data_one[:,3].tolist())
                 if len(word_one)<Config.max_vector_len:
                     length = len(word_one)
                     word_one.extend([Config.word_len-1]*(Config.max_vector_len-length))
-                    tmp = [0]*(Config.max_vector_len-length)
-                    label_one.extend(tmp)
                     task_one.extend([task]*(Config.max_vector_len-length))
                 else:
                     word_one = word_one[:Config.max_vector_len]
-                    label_one = label_one[:Config.max_vector_len]
                     task_one = task_one[:Config.max_vector_len]
                 sent_list.append(word_one)
                 detail_list.append(task_one)
-                label_list.append(label_one)
                 mask_list.append(mask_one)
             pass
 
-        return sent_list, detail_list,label_list,mask_list
+        return sent_list, detail_list,mask_list
         pass
 
     def load_data_batch(self,batch_size):
         start = 0
         new_order = range(len(self.data[0]))
-        random.shuffle(new_order)
-        new_order = new_order[:int(0.2*len(new_order))]
+        # random.shuffle(new_order)
+        # new_order = new_order[:int(0.2*len(new_order))]
         for _ in range(len(new_order) / batch_size + 1):
             if start + batch_size <=len(new_order):
                 end = start + batch_size
+                if start >= len(new_order):
+                    break
                 data_out = new_order[start:end]
                 start = end
-                if start>=len(new_order):
-                    break
+
             else:
+                if start >= len(new_order):
+                    break
                 data_out = new_order[start:]
 
             yield [self.data[0][d] for d in data_out], \
                       [self.data[1][d] for d in data_out], \
-                      [self.data[2][d] for d in data_out],\
-                      [self.data[3][d] for d in data_out],
+                      [self.data[2][d] for d in data_out]
 
 if __name__=='__main__':
     label = ['z']
