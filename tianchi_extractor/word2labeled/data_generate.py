@@ -112,7 +112,8 @@ if __name__=='__main__':
                 # step 3: preprocessing input
                 content = list(filter(lambda x: x, map(lambda x: re.sub(' ', '', x), get_data(input_file))))
                 content = [e + '||' if '|' in e else e for e in content]
-                in_string = ''.join(content).replace('（', '(').replace('）', ')')
+                in_string = ''.join(content).replace('（', '(').replace('）', ')').replace('～','~').replace('，',',').replace('：',':').replace('；', ';')\
+                    .decode('utf-8').lower()
                 # step 4: generate a out_string using label dicts. same size of in_string
                 try:
                     result = gen_out_string(label, char_mapping, in_string)

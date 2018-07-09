@@ -55,6 +55,7 @@ def make_dict(category):
 def parse_label_line(label_line, category):
     words = label_line.strip().split('\t')
     json_obj = make_dict(category)
+    # print len(words)
     if len(json_obj) > len(words):
         words += [None] * (len(json_obj)-len(words))
     for word, key in zip(words, json_obj.keys()):
@@ -64,7 +65,7 @@ def parse_label_line(label_line, category):
     return json_obj
 
 
-def gen_substitution_dict(task_name):
+def gen_substitution_dict(task_name=None):
     templates = dict([(t, make_dict(t)) for t in TASKS])
     # substitute value in each template with charactor starting from 'a'
     i = 0
@@ -74,6 +75,8 @@ def gen_substitution_dict(task_name):
                 continue
             template[key] = chr(ord('a')+i)
             i += 1
+    if not task_name:
+        return templates
     return templates[task_name]
 
 
@@ -169,7 +172,6 @@ def replace_element(out_list, start_pos, length, change_to_char):
         out_list[start_pos+i] = change_to_char
 
 
-
 def is_date(string):
     if not '-' in string:
         return False
@@ -197,14 +199,13 @@ def gen_out_string(label_list, substitution_mapping, input_str):
     :param input_str: input text string
     :return:
     '''
-    label_digits_pattern = re.compile(r"[-+]?\d*\.\d+|\d+")
     out_str_list = ['z'] * len(input_str)
     # extract informative digits in original text
     digits_strs = extract_digits(input_str)
     # print digits_strs
     for label_json in label_list:
         for key, val in label_json.items():
-            if key == 'id' or key =='buy_way' or not val:
+            if key == 'id' or key == 'buy_way' or not val:
                 continue
             # print(val)
             # here, for digital number and dates, we need to it in different way
@@ -229,6 +230,10 @@ def gen_out_string(label_list, substitution_mapping, input_str):
                 for val in vals:
                     # normal text replacement
                     if input_str.find(val) == -1:
+                        if len(vals) == 1:
+                            print 'not found string: '
+                            print input_str
+                            print val.decode('utf-8')
                         continue
                     isFound = True
                     positions = substring_indexes(val, input_str)
@@ -236,48 +241,53 @@ def gen_out_string(label_list, substitution_mapping, input_str):
                     for position in positions:
                         replace_element(out_str_list, position, len(val.decode('utf-8')), substitution_mapping[key])
                         # print(input_str[position:position+len(val)])
-                if not isFound:
-                    print('Error: text label not found in original text.')
-                    print val.decode('utf-8')
+                # if not isFound:
+                #     print('Error: text label not found in original text.')
+                #     print val.decode('utf-8')
 
     return ''.join(out_str_list)
 
 
 if __name__=='__main__':
-    # modify this path
-    base_path = '/Users/polybahn/Desktop/alicont/round1_train_20180518'
-    # THIS IS JUST A TEST. need to modify category [ZENGJIANCHI, HETONG, or DINGZENG]. and file name.
-    cat = DINGZENG
-    file_ids = ['4952968']
-    is_debug = False
-    if not is_debug:
-        file_ids = [file_name[:-5] for file_name in os.listdir(os.path.join(base_path, cat, 'html')) if file_name.endswith('html')]
-    for file_id in file_ids:
-        print file_id
-        valid_path = os.path.join(base_path, cat, 'html', file_id+'.html')
+    char_mapping = gen_substitution_dict()
+    print(char_mapping)
 
-        # step 1: read all labels in this category
-        labels = read_labels(os.path.join(base_path, cat, cat + '.train'), cat)
-        label = labels[file_id]
-        # print(label)
-
-        # step 2: get substitution mapping of this category
-        char_mapping = gen_substitution_dict(cat)
-        # print(char_mapping)
-
-        # step 3: preprocessing input
-        # remove spaces in each element in resulting list of get_data() function
-        content = list(filter(lambda x: x, map(lambda x: re.sub(' ', '', x), get_data(valid_path))))
-        # for tabular situation, please refer example: gupiao/10112. We need to add stop sign('||') between adjacent rows
-        content = [e + '||' if '|' in e else e for e in content]
-        # done pre processing, combine as input
-        in_string = ''.join(content).replace('（', '(').replace('）', ')').decode('utf-8').lower()
-        print(in_string)
-
-        # step 4: generate a out_string using label dicts. same size of in_string
-        result = gen_out_string(label, char_mapping, in_string)
-        # for c, l in zip(in_string, result):
-        #     print c + ' ' + l
+    # # modify this path
+    # base_path = '/Users/polybahn/Desktop/alicont/round1_train_20180518'
+    # # THIS IS JUST A TEST. need to modify category [ZENGJIANCHI, HETONG, or DINGZENG]. and file name.
+    # cat = HETONG
+    # print cat
+    # file_ids = ['4952968']
+    # is_debug = True
+    # if not is_debug:
+    #     file_ids = [file_name[:-5] for file_name in os.listdir(os.path.join(base_path, cat, 'html')) if file_name.endswith('html')]
+    # # for each file do following:
+    # for file_id in file_ids:
+    #     print file_id
+    #     valid_path = os.path.join(base_path, cat, 'html', file_id+'.html')
+    #
+    #     # step 1: read all labels in this category
+    #     labels = read_labels(os.path.join(base_path, cat, cat + '.train'), cat)
+    #     label = labels[file_id]
+    #     # print(labels)
+    #
+    #     # step 2: get substitution mapping of this category
+    #     char_mapping = gen_substitution_dict(cat)
+    #     # print(char_mapping)
+    #
+    #     # step 3: preprocessing input
+    #     # remove spaces in each element in resulting list of get_data() function
+    #     content = list(filter(lambda x: x, map(lambda x: re.sub(' ', '', x), get_data(valid_path))))
+    #     # for tabular situation, please refer example: gupiao/10112. We need to add stop sign('||') between adjacent rows
+    #     content = [e + '||' if '|' in e else e for e in content]
+    #     # done pre processing, combine as input
+    #     in_string = ''.join(content).replace('（', '(').replace('）', ')').decode('utf-8').lower()
+    #     print(in_string)
+    #
+    #     # step 4: generate a out_string using label dicts. same size of in_string
+    #     result = gen_out_string(label, char_mapping, in_string)
+    #     # for c, l in zip(in_string, result):
+    #     #     print c + ' ' + l
 
 
 
@@ -313,7 +323,7 @@ if __name__=='__main__':
 #                 item=w[label]
 #                 for alpahbet in item:#####uppercase if there is alphabet in key
 #                     if alpahbet.isalpha():
-#                         alpahbet.upper
+#                         alpahbet.upper()
 #
 #             key={}
 #             count=1
