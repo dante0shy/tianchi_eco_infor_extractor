@@ -437,9 +437,15 @@ def convert_dingzeng(ori_key, val_str):
     val = ''
     if not val_str[0].isdigit():
         return key, ''
-    if '.' in val_str or unit in ['元', '亿', '万']:
+    if '.' in val_str or unit in ['元', '亿', '万', '元']:
         key = 'money'
         new_val = float(val_str.replace(',', ''))
+        if unit == '元':
+            pass
+        elif unit == '万':
+            new_val *= 10000
+        elif unit == '亿':
+            new_val *= 100000000
         val = new_val if new_val > 10000 else ''
     elif ',' in val_str or unit == '股':
         key = 'amount'
