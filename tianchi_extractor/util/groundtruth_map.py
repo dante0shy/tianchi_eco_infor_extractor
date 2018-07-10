@@ -7,6 +7,7 @@ import os
 import html2text
 import re
 import collections
+from orderedset import OrderedSet
 
 ###read html function
 from tianchi_extractor.config import HETONG, ZENGJIANCHI, DINGZENG, TASKS, hetong_string, dingzeng_string, \
@@ -78,6 +79,18 @@ def gen_substitution_dict(task_name=None):
     if not task_name:
         return templates
     return templates[task_name]
+
+
+def reverse_mapping(char_mapping):
+    reversed_map = collections.OrderedDict()
+    for key, d in char_mapping.iteritems():
+        new_d = collections.OrderedDict()
+        for field, char in d.iteritems():
+            if field == 'id':
+                continue
+            new_d[char] = field
+        reversed_map[key] = new_d
+    return reversed_map
 
 
 def read_labels(label_file_path, task_name):
@@ -248,9 +261,294 @@ def gen_out_string(label_list, substitution_mapping, input_str):
     return ''.join(out_str_list)
 
 
+def extract_ori_text(blocks, rev_m):
+    result = list()
+    cur_tag = 'z'
+    cur_res = ''
+    for block in blocks:
+        ori_word = block[0]
+        tags = block[3]
+        for char, tag in zip(ori_word, tags):
+            if not tag == cur_tag:
+                if not cur_tag == 'z':
+                    if cur_tag in ['e', 'f', 'j', 'k', 'l', 'q', 'r', 's', 't']:
+                        result.append((cur_tag, cur_res+char))
+                    else:
+                        result.append((cur_tag, cur_res))
+                cur_res = '' + char
+                cur_tag = tag
+            else:
+                cur_res += char
+    return map(lambda x: (rev_m[x[0]], x[1]), filter(lambda x: x[0] in rev_m, result))
+
+
+def convert_int_or_float(int_str):
+    unit = int_str[-1]
+    int_str = int_str[:-1].replace(',', '')
+    try:
+        if '.' in int_str:
+            ret = float(int_str)
+        else:
+            ret = int(int_str)
+    except Exception:
+        print('Error when converting numerical value: ', int_str)
+        return None, unit
+    return ret, unit
+
+
+def append_something_to_final_list(val_of_set, l):
+    if not val_of_set:
+        l.append('')
+        return
+    l.append(val_of_set.pop())
+
+
+def listify(orderedset):
+    return [t for t in orderedset]
+
+
+def deal_hetong(id, extracted_list):
+    result = list()
+    temp_dic = dict([(u'party_a', OrderedSet()), (u'party_b', OrderedSet()), (u'project_name', OrderedSet()),
+                     (u'contract_name', OrderedSet()), (u'up_limit', OrderedSet()), (u'low_limit', OrderedSet()), (u'union_member', OrderedSet())])
+    for key, val in extracted_list:
+        if key in ['low_limit', 'up_limit']:
+            val, unit = convert_int_or_float(val)
+            if val:
+                if unit == '万':
+                    val *= 10000
+                elif unit == '亿':
+                    val *= 100000000
+                elif unit == '元':
+                    pass
+                else:
+                    print('其他合同金额单位！')
+                    print('id '+str(id))
+                    print(str(val)+unit)
+                    continue
+        temp_dic[key].add(val)
+
+    # check if this contract only contains one line
+    if not len(temp_dic['party_b']) == 1:
+        print('非法：合同里面乙方为空')
+        print('id: ' + str(id))
+        return result
+
+    is_only_one = True
+    for k, v in temp_dic.iteritems():
+        if len(v) > 1:
+            is_only_one = False
+    if not temp_dic['up_limit']:
+        temp_dic['up_limit'] = temp_dic['low_limit']
+    ret_l = list()
+    if is_only_one:
+        append_something_to_final_list(temp_dic['party_a'], ret_l)
+        append_something_to_final_list(temp_dic['party_b'], ret_l)
+        append_something_to_final_list(temp_dic['project_name'], ret_l)
+        append_something_to_final_list(temp_dic['contract_name'], ret_l)
+        append_something_to_final_list(temp_dic['up_limit'], ret_l)
+        append_something_to_final_list(temp_dic['low_limit'], ret_l)
+        append_something_to_final_list(temp_dic['union_member'], ret_l)
+
+    # only party_a and project_name can duplicate
+    if ret_l:
+        result.append(ret_l)
+
+    if len(temp_dic['party_a']) == len(temp_dic['project_name']) and len(temp_dic['party_a']) > 1 and len(temp_dic['low_limit']) == len(temp_dic['party_a']):
+        # case 1: multiple party_a with multiple project name
+        for party_a, pro_name, limit in zip(listify(temp_dic['party_a']), listify(temp_dic['project_name']), listify(temp_dic['low_limit'])):
+            ret = [party_a,
+                   temp_dic['party_b'].pop() if temp_dic['party_b'] else '',
+                   pro_name,
+                   temp_dic['contract_name'].pop() if temp_dic['contract_name'] else '',
+                   limit,
+                   limit,
+                   temp_dic['union_member'].pop() if temp_dic['union_member'] else '']
+            result.append(ret)
+    elif len(temp_dic['project_name']) > 1 and len(temp_dic['project_name']) == len(temp_dic['low_limit']):
+        # case 2: only project name varies
+        for proj_name, limit in zip(listify(temp_dic['project_name']), listify(temp_dic['low_limit'])):
+            ret = [temp_dic['party_a'].pop() if temp_dic['party_a'] else '',
+                   temp_dic['party_b'].pop() if temp_dic['party_b'] else '',
+                   proj_name,
+                   temp_dic['contract_name'].pop() if temp_dic['contract_name'] else '',
+                   limit,
+                   limit,
+                   temp_dic['union_member'].pop() if temp_dic['union_member'] else '']
+            result.append(ret)
+    elif len(temp_dic['project_name']) <= 1 and len(temp_dic['party_a']) <= 1 and len(temp_dic['low_limit']) > 1:
+        # case 3: error: multiple low_limit -> pick first
+        if len(temp_dic['low_limit']) == 2:
+            for limit in listify(temp_dic['low_limit']):
+                ret = [temp_dic['party_a'].pop() if temp_dic['party_a'] else '',
+                       temp_dic['party_b'].pop() if temp_dic['party_b'] else '',
+                       temp_dic['project_name'].pop() if temp_dic['project_name'] else '',
+                       temp_dic['contract_name'].pop() if temp_dic['contract_name'] else '',
+                       limit,
+                       limit,
+                       temp_dic['union_member'].pop() if temp_dic['union_member'] else '']
+                result.append(ret)
+        else:
+            ret = [temp_dic['party_a'].pop() if temp_dic['party_a'] else '',
+                   temp_dic['party_b'].pop() if temp_dic['party_b'] else '',
+                   temp_dic['project_name'].pop() if temp_dic['project_name'] else '',
+                   temp_dic['contract_name'].pop() if temp_dic['contract_name'] else '',
+                   temp_dic['up_limit'][0],
+                   temp_dic['low_limit'][0],
+                   temp_dic['union_member'].pop() if temp_dic['union_member'] else '']
+            result.append(ret)
+    elif len(temp_dic['contract_name']) > 1 and len(temp_dic['party_a']) == 1 and len(temp_dic['project_name']) == 1 and (
+        len(temp_dic['contract_name']) == len(temp_dic['low_limit']) and len(temp_dic['party_b']) == 1):
+        # case 4: multiple contract name
+        for con_name, limit in zip(listify(temp_dic['contract_name']), listify(temp_dic['low_limit'])):
+            ret = [temp_dic['party_a'].pop() if temp_dic['party_a'] else '',
+                   temp_dic['party_b'].pop() if temp_dic['party_b'] else '',
+                   temp_dic['project_name'].pop() if temp_dic['project_name'] else '',
+                   con_name,
+                   limit,
+                   limit,
+                   temp_dic['union_member'].pop() if temp_dic['union_member'] else '']
+            result.append(ret)
+    if not result:
+        print('某些field非唯一！')
+        print('id ' + str(id))
+        obj = dict([(k, list(v)) for k, v in temp_dic.iteritems()])
+        print(obj)
+        # with open('/Users/polybahn/Desktop/temp/' + str(id) + '.json', 'wb') as error_f:
+        #     json.dump(obj, error_f)
+
+    return result
+
+
+def make_a_ding_zeng_obj():
+    dic = collections.OrderedDict()
+    dic[u'target'] = ''
+    dic[u'amount'] = ''
+    dic[u'money'] = ''
+    dic[u'lock_time'] = ''
+    dic[u'pay_method'] = ''
+    return dic
+
+
+def convert_dingzeng(ori_key, val_str):
+    unit = val_str[-1]
+    val_str = val_str[:-1]
+    key = ori_key
+    val = ''
+    if not val_str[0].isdigit():
+        return key, ''
+    if '.' in val_str or unit in ['元', '亿', '万']:
+        key = 'money'
+        new_val = float(val_str.replace(',', ''))
+        val = new_val if new_val > 10000 else ''
+    elif ',' in val_str or unit == '股':
+        key = 'amount'
+        new_val = int(val_str.replace(',', ''))
+        val = new_val if new_val > 1000 else ''
+    elif int(val_str) in [12, 28, 24, 30, 36] or unit in ['个', '月']:
+        key = 'lock_time'
+        val = int(val_str)
+    if unit in ['%']:
+        val = ''
+    return key, val
+
+
+
+
+def deal_dingzeng(id, extracted_list):
+    d = dict()
+    cur_target = ''
+    lock_time = ''
+    pay_method = ''
+    for item in extracted_list:
+        if item[0] == 'target':
+            cur_target = item[1]
+            if cur_target not in d:
+                obj = make_a_ding_zeng_obj()
+                obj['target'] = cur_target
+                d[cur_target] = obj
+        elif item[0] in ['amount', 'money', 'lock_time'] and cur_target:
+            k, v = convert_dingzeng(item[0], item[1])
+            if v:
+                d[cur_target][k] = v
+                if k == 'lock_time':
+                    lock_time = v
+        elif item[0] == 'pay_method':
+            pay_method = item[1]
+            if cur_target:
+                d[cur_target]['pay_method'] = pay_method
+    for k, v in d.iteritems():
+        if not v['lock_time']:
+            v['lock_time'] = lock_time
+        if not v['pay_method']:
+            v['pay_method'] = pay_method
+    if not d:
+        return None
+    return [[t for t in val.values()] for val in d.values()]
+
+
+
+
 if __name__=='__main__':
     char_mapping = gen_substitution_dict()
     print(char_mapping)
+    reversed_m = reverse_mapping(char_mapping)
+    print(reversed_m)
+
+    test_res_dir = os.path.join(os.getcwd(), '../..', 'test_res')
+    out_dir = os.path.join(os.getcwd(), '../..', 'final_out')
+    if not os.path.exists(out_dir):
+        os.makedirs(out_dir)
+
+    is_debug = False
+    is_debug_single = False
+    task = HETONG
+    test_file_id = '1087977 (1).json'
+
+    if is_debug:
+        task_names = ['dingzeng']
+    else:
+        task_names = TASKS
+
+    for TASK_NAME in task_names:
+        mapping = reversed_m[TASK_NAME]
+        in_folder = os.path.join(test_res_dir, TASK_NAME)
+        with open(os.path.join(out_dir, TASK_NAME+'.txt'), 'wb') as out_f:
+            if TASK_NAME == DINGZENG:
+                out_f.write('公告id	增发对象	增发数量	增发金额	锁定期	认购方式\n')
+            elif TASK_NAME == HETONG:
+                out_f.write('公告id	甲方	乙方	项目名称	合同名称	合同金额上限	合同金额下限	联合体成员\n')
+            else:
+                out_f.write('公告id	股东全称	股东简称	变动截止日期	变动价格	变动数量	变动后持股数	变动后持股比例\n')
+            if is_debug_single:
+                files = [test_file_id]
+            else:
+                files = os.listdir(in_folder)
+            for file_name in files:
+                f_path = os.path.join(in_folder, file_name)
+                with open(f_path, 'r') as in_f:
+                    in_list = json.load(in_f)
+                if not in_list:
+                    continue
+                id = file_name[:-5].replace(' (1)', '').strip()
+                result = extract_ori_text(in_list, mapping)
+                # json.dump(result, out_f)
+                final_out = None
+                if TASK_NAME == DINGZENG:
+                    final_out = deal_dingzeng(id, result)
+                elif TASK_NAME == HETONG:
+                    final_out = deal_hetong(id, result)
+                else:
+                    final_out = None
+                if not final_out:
+                    continue
+                for final_item in final_out:
+                    final_item.insert(0, id)
+                    out_str = '\t'.join([str(t) for t in final_item])
+                    out_f.write(out_str.strip()+'\n')
+
+
+
 
     # # modify this path
     # base_path = '/Users/polybahn/Desktop/alicont/round1_train_20180518'
